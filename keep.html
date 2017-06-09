@@ -1,0 +1,43 @@
+<html>
+   <head>
+      <link rel="stylesheet" href="./material.min.css">
+      <script src="./material.min.js"></script>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">      
+      <link rel="stylesheet" href="style.css">
+   </head>
+   <body>
+      <div class="mdl-layout mdl-js-layout mdl-layout--fixed-header">
+      <header class="mdl-layout__header">
+         <div class="mdl-layout__header-row">
+            <!-- Title -->
+            <span class="mdl-layout-title">Keeping tabs on...</span>
+         </div>
+         <!-- Tabs -->
+         <div class="mdl-layout__tab-bar mdl-js-ripple-effect" id="tabsTitles">
+         </div>
+      </header>
+      <div class="mdl-layout__drawer">
+         <span class="mdl-layout-title">KeepTab</span>
+      </div>
+      <main class="mdl-layout__content" id="tabsContents">
+         <div class="overlay" id="overlay">
+            <a class="return-button" target="_blank">Reload page</a>
+         </div>
+      </main>
+      </div>
+
+      <template id="tabTitleTemplate">
+         <a class="mdl-layout__tab truncate"></a>
+      </template>
+
+      <template id="tabContentTemplate">
+         <section class="mdl-layout__tab-panel">
+            <div class="page-content">
+               <iframe><p>Your browser does not support iframes.</p></iframe>
+            </div>
+         </section>
+      </template>
+
+      <script src="keep.js"></script>
+   </body>
+</html>
