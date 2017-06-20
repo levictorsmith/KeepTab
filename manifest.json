@@ -4,27 +4,35 @@
   "name": "KeepTab",
   "description": "Fight saw tabs; organize them.",
   "version": "0.1",
-  "icons": {"128": "Hrag Chanchanian.png"},
+  "icons": {"128": "keepTab.png"},
   "background": {
     "persistent": false,
     "scripts": ["background.js"]
   },
   "browser_action": {
-    "default_icon": "Hrag Chanchanian.png",
+    "default_icon": "keepTab.png",
     "default_popup": "popup.html",
     "default_title": "Saved tabs"
   },
   "commands": {
-    "merge-tab": {
+    "merge-default": {
+      "description": "Merge current tab into (default) left-adjacent tab",
+      "suggested_key": { "default": "Alt+M" }
+    },
+    "merge-left": {
       "description": "Merge current tab into left-adjacent tab",
-      "suggested_key": { "default": "Ctrl+Shift+L" }
+      "suggested_key": { "default": "Alt+Left" }
+    },
+    "merge-right": {
+      "description": "Merge current tab into right-adjacent tab",
+      "suggested_key": { "default": "Alt+Right"}
     }
   },
   "permissions": [
-    "activeTab",
     "tabs",
     "contextMenus",
-    "notifications"
+    "notifications",
+    "<all_urls>"
   ],
   "content_security_policy": "script-src 'self' https://ajax.googleapis.com; object-src 'self'",
   "web_accessible_resources": [

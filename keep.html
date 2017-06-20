@@ -4,6 +4,7 @@
       <script src="./material.min.js"></script>
       <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">      
       <link rel="stylesheet" href="style.css">
+		<title>KeepTab</title>
    </head>
    <body>
       <div class="mdl-layout mdl-js-layout mdl-layout--fixed-header">
@@ -12,32 +13,68 @@
             <!-- Title -->
             <span class="mdl-layout-title">Keeping tabs on...</span>
          </div>
-         <!-- Tabs -->
-         <div class="mdl-layout__tab-bar mdl-js-ripple-effect" id="tabsTitles">
-         </div>
       </header>
       <div class="mdl-layout__drawer">
          <span class="mdl-layout-title">KeepTab</span>
+			<nav class="mdl-navigation">
+				<a id="rename" class="mdl-navigation__link" href="javscript:void(0);">Rename tab</a>
+			</nav>			
       </div>
-      <main class="mdl-layout__content" id="tabsContents">
-         <div class="overlay" id="overlay">
-            <a class="return-button" target="_blank">Reload page</a>
+      <main class="mdl-layout__content">
+         <div class="mdl-grid" id="tabCards">
+            
          </div>
       </main>
       </div>
 
-      <template id="tabTitleTemplate">
-         <a class="mdl-layout__tab truncate"></a>
-      </template>
+		<!-- CARD TEMPLATE -->
+		<template id="tabCardTemplate">
+			<div class="square-card mdl-card mdl-shadow--2dp mdl-cell mdl-cell--4-col">
+				<div id="cardHeader" class="mdl-card__title mdl-card--expand preview">
+					<h2 id="cardTitle" class="mdl-card__title-text truncate"></h2>
+				</div>
+				<div id="cardContent" class="mdl-card__supporting-text truncate">
+				</div>
+				<div class="mdl-card__actions mdl-card--border">
+					<a id="cardAction" class="mdl-button mdl-button--colored mdl-js-button mdl-js-ripple-effect restore mdl-button--raised" target="_blank">
+						Restore Tab
+					</a>
+				</div>
+				<div class="mdl-card__menu">
+					<button id="cardClose" class="mdl-button mdl-button--icon mdl-js-button mdl-js-ripple-effect">
+						<i class="material-icons">close</i>
+					</button>
+				</div>							
+			</div>     
+		</template>
 
-      <template id="tabContentTemplate">
-         <section class="mdl-layout__tab-panel">
-            <div class="page-content">
-               <iframe><p>Your browser does not support iframes.</p></iframe>
-            </div>
-         </section>
-      </template>
+		<!--RENAME DIALOG-->
+		<dialog id="renameDialog" class="mdl-dialog">
+			<h4 class="mdl-dialog__title">Rename tab</h4>
+			<div class="mdl-dialog__content">
+				<p>
+				Rename this tab to something helpful.
+				</p>
+				<div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+					<input class="mdl-textfield__input" type="text" id="newTitle">
+					<label class="mdl-textfield__label" for="sample3">Title</label>
+				</div>				
+			</div>
+			<div class="mdl-dialog__actions">
+				<button type="button" class="mdl-button confirm">Rename</button>
+				<button type="button" class="mdl-button close">Cancel</button>
+			</div>
+		</dialog>
 
+		<!--TAB PREVIEW DIALOG-->
+		<dialog id="tabPreview" class="mdl-dialog">
+			<h4 class="mdl-dialog__title">Preview</h4>
+			<div id="previewImage" class="mdl-dialog__content preview">
+
+			</div>
+		</dialog>
+	  
+	  <script src="db.js"></script>
       <script src="keep.js"></script>
    </body>
 </html>
