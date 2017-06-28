@@ -1,34 +1,18 @@
 //TODO: Add functionality to have saved sessions
 var tabs = chrome.extension.getBackgroundPage().tempTabs;
+var background = chrome.extension.getBackgroundPage();
 var previewDialog = document.querySelector('#tabPreview');
 var renameDialog = document.querySelector('#renameDialog');
-
-
-if (!tabs || tabs.length == 0) {
-	chrome.tabs.getCurrent(function (current) {
-		tabs = JSON.parse(sessionStorage.getItem('keepTab-' + current.id));
-		console.log(tabs);
-		for (imageTab of tabs) {
-			console.log("Creating nodes");
+var sessionId = (new URLSearchParams(window.location.search)).get('session');
+console.debug("SESSION ID: ", sessionId);
+background.getSessionUrls(sessionId, function (urls) {
+	for (url of urls) {
+		constructImageTab(url, function (imageTab) {
+			console.debug("IMAGE TAB: ", imageTab);
 			createTabEl(imageTab);
-		}		
-	});
-} else {
-	console.log(tabs);
-	for (imageTab of tabs) {
-		console.log("Creating nodes");
-		createTabEl(imageTab);
+		});
 	}
-}
-chrome.tabs.getCurrent(function (current) {
-	//TODO: Maybe DON'T save the entire imageTab array. That's a crap ton of binary data.
-	//? Perhaps have a WebSQL cache or IndexedDB?
-	
-	
-	chrome.extension.getBackgroundPage().tempTabs = [];
-	chrome.runtime.onMessage.addListener(getAllKeptTabs);	
 });
-
 
 initListeners();
 function initListeners() {
@@ -82,42 +66,6 @@ function createTabEl(imageTab) {
 	document.querySelector('#tabCards').appendChild(tabCard);
 }
 
-/**
- * getAllKeptTabs: Returns an array of the tabs that are being kept on this page
- * @param {Object} request 
- * @param {Object} sender 
- * @param {Object} sendResponse 
- */
-function getAllKeptTabs(request, sender, sendResponse) {
-	if (request.command == "getAllKeptTabs") {
-		var imageTabs = [];
-		var cards = document.querySelectorAll('.square-card');
-		cards.forEach(function (card) {
-				imageTabs.push(parseImageCard(card));
-		});
-		sendResponse({imageTabs: imageTabs});
-	} else {
-		console.warn("Request received, but not from expected source");
-	}
-}
-
-/**
- * parseImageCard: Gets the imageTab info from a card in the document
- * @param {Node} card - The image card with the kept tab
- */
-function parseImageCard(card) {
-	var imageTab = {};
-	imageTab.tab = {};
-	//The tab id isn't really that important here, but since we are assuming that it has one, we need to put it there.
-	imageTab.tab.id = Number(card.id.substring(4));
-	imageTab.tab.title = card.querySelector("#cardTitle").innerHTML;
-	imageTab.tab.url = card.querySelector("#cardContent").innerHTML;
-	//This has url("") surrounding the actual url, so we need to remove it.
-	var imageUrl = card.querySelector('#cardHeader').style.backgroundImage;
-	imageTab.imageUrl = imageUrl.substring(5, imageUrl.length - 2);
-	return imageTab;
-}
-
 function renameTitle() {
 	var newTitle = renameDialog.querySelector('#newTitle').value;
 	document.title = newTitle;
@@ -125,21 +73,22 @@ function renameTitle() {
 }
 
 function deleteCard(id) {
-	chrome.tabs.getCurrent(function (current) {
-		var parent = document.querySelector('#tabCards');
-		var child = document.querySelector('#' + id);
-		id = Number(id.replace('tab-',""));
-		var index = tabs.findIndex(function (imageTab) {
-			return imageTab.tab.id == id;
-		});
-		if (index != -1) {
-			//TODO: Maybe DON'T save the entire imageTab array. That's a crap ton of binary data.
-			//? Perhaps have a WebSQL cache or IndexedDB?
-			tabs.splice(index, 1);
-			sessionStorage.setItem('keepTab-' + current.id, JSON.stringify(tabs));
-			parent.removeChild(child);			
-		}
-	});
+	var parent = document.querySelector('#tabCards');
+	var child = document.querySelector('#' + id);
+	var url = child.querySelector('#cardContent').innerHTML;
+	parent.removeChild(child);
+	background.removeImage(url);
+	background.removeTab(url);
+	background.removeUrlFromSession(sessionId, url);
+	if (parent.children.length == 0) {
+		//! It won't delete the record for some stupid reason. It works in the background
+		//! page, but not this script. Super confusing.
+		if (confirm("There are no tabs to keep. Close Window?")) {
+			background.removeSession(sessionId, function () {
+				window.close();
+			});
+		}		
+	}
 }
 
 function deleteWithId(e) {
@@ -168,4 +117,15 @@ function hidePreview(e) {
 	} catch(ex) {
 		//Empty because I don't want to see all the DOMExceptions
 	}
+}
+
+function constructImageTab(url, callback) {
+	var imageTab = {};
+	background.getImage(url, function (dataUrl) {
+		imageTab.imageUrl = dataUrl;
+		background.getTab(url, function (tab) {
+			imageTab.tab = tab;
+			callback(imageTab);
+		});
+	});
 }

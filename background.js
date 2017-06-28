@@ -1,44 +1,5 @@
 //TODO: Change all imageTabs to just regular tab objects
-const EXTENSION_URL = chrome.runtime.getURL("/");
-//Set up Database
-const DATABASE_NAME = "keepTab";
-const TAB_STORE = "TabStore";
-const IMAGE_STORE = "ImageStore";
-const IMAGE_INDEX = "ImageIndex";
-const TAB_INDEX = "TabIndex";
-// IndexedDB
-var indexedDB = window.indexedDB;
-
-var open = indexedDB.open(DATABASE_NAME, 1);
-
-var db;
-var imageStore;
-var imageIndex;
-var tabStore;
-var tabIndex;
-var tx;
-
-//Create schema
-open.onupgradeneeded = function () {
-	db = open.result;
-	imageStore = db.createObjectStore(IMAGE_STORE, {keyPath: "id"});
-  tabStore = db.createObjectStore(TAB_STORE, {keyPath: "id"});
-	imageIndex = imageStore.createIndex(IMAGE_INDEX, ["image.tabId"]);
-  tabIndex = tabStore.createIndex(TAB_INDEX, ["tab.url"]);
-};
-
-open.onsuccess = function () {
-	db = open.result;
-	tx = db.transaction(IMAGE_STORE, "readwrite");
-	imageStore = tx.objectStore(IMAGE_STORE);
-	imageIndex = imageStore.index(IMAGE_INDEX);
-  tabStore = tx.objectStore(TAB_STORE);
-  tabIndex = tabStore.index(TAB_INDEX);
-};
-
-tx.oncomplete = function () {
-	db.close();
-}
+//TODO: Add session functionality
 
 var tempTabs = [];
 /**
@@ -117,10 +78,8 @@ function getNextIndex(command, tab, tabs) {
  */
 function getFirstTabImage(imageTab1, imageTab2, tabs) {
   chrome.tabs.captureVisibleTab(function (dataUrl) {
-    //TODO: Save image to db
-    imageStore.put({id: imageTab1.tab.id, url: dataUrl});
-    tabStore.put({id: imageTab1.tab.id, url: imageTab1.tab.url, tab: imageTab1.tab});
-    imageTab1.imageUrl = dataUrl;
+    //Save image and tab to DB
+    insertImageTab(imageTab1, dataUrl);
     //If the merge attempted tab is already keeping tabs, include all those tabs too
     if (imageTab1.tab.url.includes(EXTENSION_URL + "keep.html")) {
       pushKeptTabs(imageTab1);
@@ -140,9 +99,8 @@ function getFirstTabImage(imageTab1, imageTab2, tabs) {
 function getSecondTabImage(imageTab1, imageTab2, tabs) {
   chrome.tabs.update(imageTab2.tab.id, {active: true}, function (focusedTab) {
     chrome.tabs.captureVisibleTab(function (dataUrl) {
-      //TODO: Save image to db
-      imageStore.put({id: imageTab2.tab.id, url: dataUrl});
-      tabStore.put({id: imageTab2.tab.id, url: imageTab2.tab.url, tab: imageTab2.tab});
+
+      insertImageTab(imageTab2, dataUrl);
       imageTab2.imageUrl = dataUrl;
       //If the merge attempted tab is already keeping tabs, include all those tabs too
       if (imageTab2.tab.url.includes(EXTENSION_URL + "keep.html")) {
@@ -164,8 +122,21 @@ function finishMerge(imageTab1, imageTab2) {
   //Remove old tabs and merge into a new tab
   chrome.tabs.remove(imageTab1.tab.id, function () {
     chrome.tabs.remove(imageTab2.tab.id, function () {
-      var url = EXTENSION_URL + "keep.html";
-      chrome.tabs.create({"url": url, "index": imageTab1.tab.index, active: true});
+      //Call mergeKeptTabs to get the sessionUrls
+      mergeKeptTabs(imageTab1, imageTab2, function (sessionUrls) {
+        //If there are no previously kept tabs
+        if (sessionUrls == null) {
+          sessionUrls = [];
+          sessionUrls.push(imageTab1.tab.url);
+          sessionUrls.push(imageTab2.tab.url);
+          insertSession(sessionUrls);
+        }
+        var sessionId;
+        getSessionId(sessionUrls, function (id) {
+          var url = EXTENSION_URL + "keep.html?session=" + id;
+          chrome.tabs.create({"url": url, "index": imageTab1.tab.index, active: true});        
+        });
+      });
     });
   });
 }
@@ -179,4 +150,50 @@ function pushKeptTabs(imageTab) {
   chrome.tabs.sendMessage(imageTab.tab.id, {command: "getAllKeptTabs"}, function (response) {
     Array.prototype.push.apply(tempTabs, response.imageTabs);
   });
+}
+
+function mergeKeptTabs(imageTab1, imageTab2, callback) {
+  var tab1HasKept = imageTab1.tab.url.includes(EXTENSION_URL + "keep.html");
+  var tab2HasKept = imageTab2.tab.url.includes(EXTENSION_URL + "keep.html");
+  var sessionId;
+  var sessionUrls = null;
+  //If both have kept tabs
+  if (tab1HasKept && tab2HasKept) {
+    //Get the SessionIds from the tabs
+    var urlParams1 = (new URL(imageTab1.tab.url)).searchParams;
+    var sessionId1 = urlParams1.get('session');
+    var urlParams2 = (new URL(imageTab2.tab.url)).searchParams;
+    var sessionId2 = urlParams2.get('session');
+    var urls1;
+    var urls2; 
+    getSessionUrls(sessionId1, function (urls) {
+      urls1 = urls;
+      getSessionUrls(sessionId2, function (urls) {
+        urls2 = urls;
+        Array.prototype.push.apply(urls1, urls2);
+        insertSession(urls1);
+        removeSession(sessionId1);
+        removeSession(sessionId2);
+        sessionUrls = urls1;
+        callback(sessionUrls);
+      });
+    });
+  } else if (tab1HasKept) {
+    let urlParams = (new URL(imageTab1.tab.url)).searchParams;
+    sessionId = urlParams.get('session');
+    addUrlToSession(sessionId,imageTab2.tab.url, function (urls) {
+      sessionUrls = urls;
+      callback(sessionUrls);
+    });
+  } else if (tab2HasKept) {
+    let urlParams = (new URL(imageTab2.tab.url)).searchParams;
+    sessionId = urlParams.get('session');
+    addUrlToSession(sessionId, imageTab1.tab.url, function (urls) {
+      sessionUrls = urls;
+      callback(sessionUrls);
+    });
+  } else {
+    //There were no previously kept tabs
+    callback(null);
+  }
 }

@@ -7,7 +7,7 @@
   "icons": {"128": "keepTab.png"},
   "background": {
     "persistent": false,
-    "scripts": ["background.js"]
+    "scripts": ["background.js", "db.js"]
   },
   "browser_action": {
     "default_icon": "keepTab.png",
