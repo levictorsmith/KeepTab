@@ -15,6 +15,10 @@ background.getSessionUrls(sessionId, function (urls) {
 });
 
 initListeners();
+/**
+ * initListeners:
+ * Sets all the listeners in the document
+ */
 function initListeners() {
 	//Preview Dialog
 	previewDialog.addEventListener('mouseover', showPreview);
@@ -32,7 +36,8 @@ function initListeners() {
 }
 
 /**
- * 
+ * createTabEl:
+ * Inserts a new tab card into the document using the given imageTab object
  * @param {Object} imageTab - An object containing the Tab object and an image url for the thumbnail
  */
 function createTabEl(imageTab) {
@@ -65,13 +70,20 @@ function createTabEl(imageTab) {
 
 	document.querySelector('#tabCards').appendChild(tabCard);
 }
-
+/**
+ * renameTitle:
+ * Renames the title of the current tab
+ */
 function renameTitle() {
 	var newTitle = renameDialog.querySelector('#newTitle').value;
 	document.title = newTitle;
 	renameDialog.close();
 }
-
+/**
+ * deleteCard:
+ * Deletes the card from the DOM, then removes it from the DB
+ * @param {String} id - The id of the tab you want to delete
+ */
 function deleteCard(id) {
 	var parent = document.querySelector('#tabCards');
 	var child = document.querySelector('#' + id);
@@ -90,14 +102,22 @@ function deleteCard(id) {
 		}		
 	}
 }
-
+/**
+ * deleteWithId:
+ * Gets the id of the tab card, then removes the card and related db stuff
+ * @param {Object} e - The event 
+ */
 function deleteWithId(e) {
 	//Parentnode takes care of the 'ripple' child
 	var id = e.target.parentNode.dataset.cardId;
 	deleteCard(id);
 	hidePreview(e);
 }
-
+/**
+ * showPreview:
+ * Shows the tab preview popup
+ * @param {Object} e - The event 
+ */
 function showPreview(e) {
 	var previewImgContainer = e.target.querySelector('.preview');
 	if ((previewImgContainer == null && e.target.id == 'cardHeader')) {
@@ -110,7 +130,11 @@ function showPreview(e) {
 	var image = document.querySelector('#previewImage');
 	image.style.backgroundImage = previewImgContainer.style.backgroundImage;
 }
-
+/**
+ * hidePreview:
+ * Hides the tab preview popup
+ * @param {Object} e - The event 
+ */
 function hidePreview(e) {
 	try {
 		previewDialog.close();
@@ -119,6 +143,12 @@ function hidePreview(e) {
 	}
 }
 
+/**
+ * constructImageTab: 
+ * Makes an imageTab object out of the tab image and tab object.
+ * @param {String} url - The url of the tab
+ * @param {Function} callback - Callback with the newly created imageTab object
+ */
 function constructImageTab(url, callback) {
 	var imageTab = {};
 	background.getImage(url, function (dataUrl) {

@@ -151,7 +151,12 @@ function pushKeptTabs(imageTab) {
     Array.prototype.push.apply(tempTabs, response.imageTabs);
   });
 }
-
+/**
+ * 
+ * @param {Object} imageTab1 - A tab with an attached image
+ * @param {*} imageTab2 
+ * @param {*} callback 
+ */
 function mergeKeptTabs(imageTab1, imageTab2, callback) {
   var tab1HasKept = imageTab1.tab.url.includes(EXTENSION_URL + "keep.html");
   var tab2HasKept = imageTab2.tab.url.includes(EXTENSION_URL + "keep.html");
