@@ -7,7 +7,7 @@
   "icons": {"128": "keepTab.png"},
   "background": {
     "persistent": false,
-    "scripts": ["background.js", "db.js"]
+    "scripts": ["background.js", "db.js", "zangodb.min.js"]
   },
   "browser_action": {
     "default_icon": "keepTab.png",
@@ -17,15 +17,15 @@
   "commands": {
     "merge-default": {
       "description": "Merge current tab into (default) left-adjacent tab",
-      "suggested_key": { "default": "Alt+M" }
+      "suggested_key": { "default": "Alt+Shift+M" }
     },
     "merge-left": {
       "description": "Merge current tab into left-adjacent tab",
-      "suggested_key": { "default": "Alt+Left" }
+      "suggested_key": { "default": "Alt+Shift+Left" }
     },
     "merge-right": {
       "description": "Merge current tab into right-adjacent tab",
-      "suggested_key": { "default": "Alt+Right"}
+      "suggested_key": { "default": "Alt+Shift+Right"}
     }
   },
   "permissions": [

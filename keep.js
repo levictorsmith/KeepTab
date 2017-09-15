@@ -9,7 +9,7 @@ background.getSessionUrls(sessionId, function (urls) {
 	for (url of urls) {
 		constructImageTab(url, function (imageTab) {
 			console.debug("IMAGE TAB: ", imageTab);
-			createTabEl(imageTab);
+			createCard(imageTab);
 		});
 	}
 });
@@ -40,7 +40,7 @@ function initListeners() {
  * Inserts a new tab card into the document using the given imageTab object
  * @param {Object} imageTab - An object containing the Tab object and an image url for the thumbnail
  */
-function createTabEl(imageTab) {
+function createCard(imageTab) {
 	//Template
 	var cardT = document.querySelector('#tabCardTemplate');
 
@@ -62,11 +62,7 @@ function createTabEl(imageTab) {
 	cardClose.addEventListener('click', deleteWithId);
 	// Header
 	var cardHeader = tabCard.querySelector('#cardHeader');
-	cardHeader.style.backgroundColor = "#e0e0e0";
-	cardHeader.style.backgroundRepeat = "no-repeat";
 	cardHeader.style.backgroundImage = "url(\'" + imageTab.imageUrl + "\')";
-	cardHeader.style.backgroundSize = "contain";
-	cardHeader.style.backgroundPosition = "top center";
 
 	document.querySelector('#tabCards').appendChild(tabCard);
 }
@@ -88,18 +84,22 @@ function deleteCard(id) {
 	var parent = document.querySelector('#tabCards');
 	var child = document.querySelector('#' + id);
 	var url = child.querySelector('#cardContent').innerHTML;
-	parent.removeChild(child);
-	background.removeImage(url);
-	background.removeTab(url);
-	background.removeUrlFromSession(sessionId, url);
-	if (parent.children.length == 0) {
-		//! It won't delete the record for some stupid reason. It works in the background
-		//! page, but not this script. Super confusing.
-		if (confirm("There are no tabs to keep. Close Window?")) {
+	//If trying to delete last one
+	if (parent.children.length == 1) {
+		if (confirm("There will be no tabs to keep. Close Window?")) {
+			parent.removeChild(child);
+			background.removeImage(url);
+			background.removeTab(url);
+			background.removeUrlFromSession(sessionId, url);
 			background.removeSession(sessionId, function () {
 				window.close();
 			});
 		}		
+	} else {
+		parent.removeChild(child);
+		background.removeImage(url);
+		background.removeTab(url);
+		background.removeUrlFromSession(sessionId, url);
 	}
 }
 /**

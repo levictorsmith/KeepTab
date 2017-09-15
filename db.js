@@ -18,6 +18,12 @@ open.onsuccess = function (event) {
   db = event.target.result;
 };
 
+//Create test database from ZangoDB
+// var testDB = new zango.Db(DATABASE_NAME + "_test", { 
+// 	Tabs: ["url"],
+// 	Images: ["url"],
+// 	Sessions: ["urls"]
+// });
 /**
  * CRUD functions
  */
@@ -33,7 +39,12 @@ function insertImageTab(imageTab, dataUrl) {
     var imageStore = tx.objectStore(IMAGE_STORE);
     var tabStore = tx.objectStore(TAB_STORE);
     imageStore.add({url: imageTab.tab.url, dataUrl: dataUrl});
-    tabStore.add(imageTab.tab);
+		tabStore.add(imageTab.tab);
+		
+		// let tabs = testDB.collection("Tabs");
+		// let images = testDB.collection("Images");
+		// tabs.insert(imageTab.tab);
+		// images.insert({url: imageTab.tab.url, dataUrl: dataUrl});
 }
 
 /**
@@ -129,7 +140,7 @@ function removeSession(sessionId, callback) {
 	console.debug("SESSION", sessionId);
   	var tx = db.transaction(SESSION_STORE, "readwrite");
   	var sessionStore = tx.objectStore(SESSION_STORE);
-  	var request = sessionStore.delete(parseInt(sessionId));
+  	var request = sessionStore.delete(Number(sessionId));
 	request.onsuccess = function () {
 		if (callback !== undefined) {
 			callback();
@@ -168,12 +179,14 @@ function removeUrlFromSession(sessionId, url) {
 function upgradeDatabase(event) {
 	console.log("Create schema");
 	db = event.target.result;
+
 	imageStore = db.createObjectStore(IMAGE_STORE, {keyPath: "url"});
-  	tabStore = db.createObjectStore(TAB_STORE, {keyPath: "url"});
-  	sessionStore = db.createObjectStore(SESSION_STORE, {keyPath: "id", autoIncrement: true });
+  tabStore = db.createObjectStore(TAB_STORE, {keyPath: "url"});
+	sessionStore = db.createObjectStore(SESSION_STORE, {keyPath: "id", autoIncrement: true });
+	
 	imageIndex = imageStore.createIndex(IMAGE_INDEX, "url");
-  	tabIndex = tabStore.createIndex(TAB_INDEX, "url");
-  	sessionIndex = sessionStore.createIndex(SESSION_INDEX, "urls");
+  tabIndex = tabStore.createIndex(TAB_INDEX, "url");
+  sessionIndex = sessionStore.createIndex(SESSION_INDEX, "urls");
 }
 
 Array.prototype.remove = function (item) {

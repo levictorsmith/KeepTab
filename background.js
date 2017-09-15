@@ -1,7 +1,6 @@
 //TODO: Change all imageTabs to just regular tab objects
 //TODO: Add session functionality
 
-var tempTabs = [];
 /**
  * onMerge: Handle the 'merge' event
  * @param {Object} info - Information about the item clicked and the context where the click happened.
@@ -31,7 +30,8 @@ function onMerge(info, tab, command) {
  */
 var menuParentId = chrome.contextMenus.create({
   "id": "parent",
-  "title": "KeepTab"
+	"title": "KeepTab",
+	"contexts": ["page", "frame"]
 });
 chrome.contextMenus.create({"id": "merge", "title": "Merge into adjacent tab", "parentId": menuParentId});
 chrome.contextMenus.onClicked.addListener(onMerge);
@@ -80,12 +80,6 @@ function getFirstTabImage(imageTab1, imageTab2, tabs) {
   chrome.tabs.captureVisibleTab(function (dataUrl) {
     //Save image and tab to DB
     insertImageTab(imageTab1, dataUrl);
-    //If the merge attempted tab is already keeping tabs, include all those tabs too
-    if (imageTab1.tab.url.includes(EXTENSION_URL + "keep.html")) {
-      pushKeptTabs(imageTab1);
-    } else {
-      tempTabs.push(imageTab1);
-    }
     getSecondTabImage(imageTab1, imageTab2, tabs);
   });
 }
@@ -101,13 +95,6 @@ function getSecondTabImage(imageTab1, imageTab2, tabs) {
     chrome.tabs.captureVisibleTab(function (dataUrl) {
 
       insertImageTab(imageTab2, dataUrl);
-      imageTab2.imageUrl = dataUrl;
-      //If the merge attempted tab is already keeping tabs, include all those tabs too
-      if (imageTab2.tab.url.includes(EXTENSION_URL + "keep.html")) {
-        pushKeptTabs(imageTab2);
-      } else {
-        tempTabs.push(imageTab2);
-      }
       finishMerge(imageTab1, imageTab2);
     });
   });
@@ -131,7 +118,6 @@ function finishMerge(imageTab1, imageTab2) {
           sessionUrls.push(imageTab2.tab.url);
           insertSession(sessionUrls);
         }
-        var sessionId;
         getSessionId(sessionUrls, function (id) {
           var url = EXTENSION_URL + "keep.html?session=" + id;
           chrome.tabs.create({"url": url, "index": imageTab1.tab.index, active: true});        
@@ -141,16 +127,6 @@ function finishMerge(imageTab1, imageTab2) {
   });
 }
 
-/**
- * pushKeptTabs: Pushes onto tempTabs all the tabs in the given tab
- * @param {Object} imageTab - A tab with an attached image
- */
-function pushKeptTabs(imageTab) {
-  //Send a message to the content script of the given tab to get array of imageTabs to add to TempTabs array.
-  chrome.tabs.sendMessage(imageTab.tab.id, {command: "getAllKeptTabs"}, function (response) {
-    Array.prototype.push.apply(tempTabs, response.imageTabs);
-  });
-}
 /**
  * 
  * @param {Object} imageTab1 - A tab with an attached image
