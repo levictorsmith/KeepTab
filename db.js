@@ -1,198 +1,156 @@
-const EXTENSION_URL = chrome.runtime.getURL("/");
+var zango = require('zangodb');
+
 //Set up Database
-const DATABASE_NAME = "keepTab";
-const TAB_STORE = "TabStore";
-const IMAGE_STORE = "ImageStore";
-const SESSION_STORE = "SessionStore";
-const IMAGE_INDEX = "ImageIndex";
-const TAB_INDEX = "TabIndex";
-const SESSION_INDEX = "SessionIndex";
+const DATABASE_NAME = "KeepTab";
+const TABS_COLLECTION = "Tabs";
+const IMAGES_COLLECTION = "Images";
+const SESSIONS_COLLECTION = "Sessions";
 const DB_VERSION = 1;
-// IndexedDB
-var indexedDB = window.indexedDB;
-var db;
-var open = indexedDB.open(DATABASE_NAME, DB_VERSION);
-//Create schema
-open.onupgradeneeded = upgradeDatabase;
-open.onsuccess = function (event) {
-  db = event.target.result;
-};
-
-//Create test database from ZangoDB
-// var testDB = new zango.Db(DATABASE_NAME + "_test", { 
-// 	Tabs: ["url"],
-// 	Images: ["url"],
-// 	Sessions: ["urls"]
-// });
-/**
- * CRUD functions
- */
-
-/**********CREATE**********/
-/**
- * insertImageTab
- * @param {Object} imageTab - A tab with an image
- * @param {String} dataUrl	- The image url (base 64), BLOB
- */
-function insertImageTab(imageTab, dataUrl) {
-    var tx = db.transaction([IMAGE_STORE,TAB_STORE], "readwrite");
-    var imageStore = tx.objectStore(IMAGE_STORE);
-    var tabStore = tx.objectStore(TAB_STORE);
-    imageStore.add({url: imageTab.tab.url, dataUrl: dataUrl});
-		tabStore.add(imageTab.tab);
-		
-		// let tabs = testDB.collection("Tabs");
-		// let images = testDB.collection("Images");
-		// tabs.insert(imageTab.tab);
-		// images.insert({url: imageTab.tab.url, dataUrl: dataUrl});
-}
-
-/**
- * insertSession
- * @param {Array} urls - List of urls in that session
- */
-function insertSession(urls) {
-    var tx = db.transaction(SESSION_STORE, "readwrite");
-    var sessionStore = tx.objectStore(SESSION_STORE);
-    sessionStore.add({urls: urls});
-}
-
-/**********READ**********/
-/**
- * getSessionUrls
- * @param {String} sessionId - The id of the session, as a string.
- * @param {Function} callback - Callback with the urls
- */
-function getSessionUrls(sessionId, callback) {
-    var tx = db.transaction(SESSION_STORE, "readonly");
-    var sessionStore = tx.objectStore(SESSION_STORE);
-    var response = sessionStore.get(+sessionId);
-    response.onsuccess = function () {
-      callback(response.result.urls);
-    };
-	
-}
-/**
- * getSessionId
- * @param {Array} urls - A list of the urls in that session
- * @param {Function} callback - Callback with the sessionId
- */
-function getSessionId(urls, callback) {
-  var tx = db.transaction(SESSION_STORE, "readonly");
-  var sessionStore = tx.objectStore(SESSION_STORE);
-  console.log("URLS TEST: ", urls);
-  var index = sessionStore.index(SESSION_INDEX).get(urls);
-  index.onsuccess = function () {
-    console.debug("ID:", index.result.id);
-    callback(index.result.id);
-  };
-}
-/**
- * getImage
- * @param {String} url - The url of the associated tab
- * @param {Function} callback - Callback with the dataUrl 
- */
-function getImage(url, callback) {
-	var tx = db.transaction(IMAGE_STORE, "readonly");
-	var imageStore = tx.objectStore(IMAGE_STORE);
-	var response = imageStore.get(url);
-	response.onsuccess = function () {
-		callback(response.result.dataUrl);
-	};
-}
-/**
- * 
- * @param {String} url - The url of the associated tab
- * @param {Function} callback - Callback with the tab object
- */
-function getTab(url, callback) {
-	var tx = db.transaction(TAB_STORE, "readonly");
-	var tabStore = tx.objectStore(TAB_STORE);
-	var response = tabStore.get(url);
-	response.onsuccess = function () {
-		callback(response.result);
-	};
-}
-
-/**********UPDATE**********/
-/**
- * addUrlToSession
- * @param {String} sessionId - The id of the session 
- * @param {String} url - The url you want to add
- * @param {Function} callback - Callback with the urls
- */
-function addUrlToSession(sessionId, url, callback) {
-  getSessionUrls(sessionId, function (urls) {
-    urls.push(url);
-    var tx = db.transaction(SESSION_STORE, "readwrite");
-    var sessionStore = tx.objectStore(SESSION_STORE);
-    sessionStore.put({urls: urls, id: +sessionId});
-    callback(urls);
-  });
-}
-
-/**********DELETE**********/
-/**
- * removeSession
- * @param {String} sessionId - The id of the session you want to remove
- */
-function removeSession(sessionId, callback) {
-	console.debug("SESSION", sessionId);
-  	var tx = db.transaction(SESSION_STORE, "readwrite");
-  	var sessionStore = tx.objectStore(SESSION_STORE);
-  	var request = sessionStore.delete(Number(sessionId));
-	request.onsuccess = function () {
-		if (callback !== undefined) {
-			callback();
-		}		
-	};
-	request.onerror = function () {
-		console.error("Error deleting session");
-	};
-}
-
-function removeImage(url) {
-	var tx = db.transaction(IMAGE_STORE, "readwrite");
-	var imageStore = tx.objectStore(IMAGE_STORE);
-	imageStore.delete(url);
-}
-
-function removeTab(url) {
-	var tx = db.transaction(TAB_STORE, "readwrite");
-	var tabStore = tx.objectStore(TAB_STORE);
-	tabStore.delete(url);	
-}
-
-function removeUrlFromSession(sessionId, url) {
-	getSessionUrls(sessionId, function (urls) {
-		urls.remove(url);
-		var tx = db.transaction(SESSION_STORE, "readwrite");
-		var sessionStore = tx.objectStore(SESSION_STORE);
-		sessionStore.put({urls: urls, id: +sessionId});
-	});
-}
-
-
-/**
- * MISC
- */
-function upgradeDatabase(event) {
-	console.log("Create schema");
-	db = event.target.result;
-
-	imageStore = db.createObjectStore(IMAGE_STORE, {keyPath: "url"});
-  tabStore = db.createObjectStore(TAB_STORE, {keyPath: "url"});
-	sessionStore = db.createObjectStore(SESSION_STORE, {keyPath: "id", autoIncrement: true });
-	
-	imageIndex = imageStore.createIndex(IMAGE_INDEX, "url");
-  tabIndex = tabStore.createIndex(TAB_INDEX, "url");
-  sessionIndex = sessionStore.createIndex(SESSION_INDEX, "urls");
-}
-
 Array.prototype.remove = function (item) {
 	if (this == null) throw new TypeError('"this" is null or not defined');
 	var index = this.indexOf(item);
 	if (index > -1) {
 		this.splice(index, 1);
+	}
+};
+module.exports = {
+	db: new zango.Db(DATABASE_NAME, { 
+		[TABS_COLLECTION]: ["url"],
+		[IMAGES_COLLECTION]: ["url"],
+		[SESSIONS_COLLECTION]: ["urls"]
+	}),
+	/**
+	 * CRUD functions
+	 */
+
+	/**********CREATE**********/
+	/**
+	 * insertImageTab
+	 * @param {Object} imageTab - A tab with an image
+	 * @param {String} dataUrl	- The image url (base 64), BLOB
+	 */
+	insertImageTab: function(imageTab, dataUrl) {
+		let tabs = this.db.collection(TABS_COLLECTION);
+		let images = this.db.collection(IMAGES_COLLECTION);
+		tabs.insert(imageTab.tab);
+		images.insert({url: imageTab.tab.url, dataUrl: dataUrl});
+	},
+	/**
+	 * insertSession
+	 * @param {Array} urls - List of urls in that session
+	 */
+	insertSession: function(urls) {
+		let sessions = this.db.collection(SESSIONS_COLLECTION);
+		sessions.insert({urls: urls});
+	},
+
+	/**********READ**********/
+	/**
+	 * getSessionUrls
+	 * @param {String} sessionId - The id of the session, as a string.
+	 * @param {Function} callback - Callback with the urls
+	 */
+	getSessionUrls: function(sessionId, callback) {
+		let sessions = this.db.collection(SESSIONS_COLLECTION);
+		sessions.findOne({_id: +sessionId})
+		.then((session) => {
+			callback(session.urls);
+		});
+	},
+	/**
+	 * getSessionId
+	 * @param {Array} urls - A list of the urls in that session
+	 * @param {Function} callback - Callback with the sessionId
+	 */
+	getSessionId: function(urls, callback) {
+		let sessions = this.db.collection(SESSIONS_COLLECTION);
+		sessions.findOne({urls: urls})
+		.then((session) => {
+			callback(session._id);
+		});
+	},
+	/**
+	 * getImage
+	 * @param {String} url - The url of the associated tab
+	 * @param {Function} callback - Callback with the dataUrl 
+	 */
+	getImage: function(url, callback) {
+		let images = this.db.collection(IMAGES_COLLECTION);
+		images.findOne({url: url})
+		.then((image) => {
+			callback(image.dataUrl);
+		});
+	},
+	/**
+	 * 
+	 * @param {String} url - The url of the associated tab
+	 * @param {Function} callback - Callback with the tab object
+	 */
+	getTab: function(url, callback) {
+		let tabs = this.db.collection(TABS_COLLECTION);
+		tabs.findOne({url: url})
+		.then((tab) => {
+			callback(tab);
+		});
+	},
+
+	/**********UPDATE**********/
+	/**
+	 * addUrlToSession
+	 * @param {String} sessionId - The id of the session 
+	 * @param {String} url - The url you want to add
+	 * @param {Function} callback - Callback with the urls
+	 */
+	addUrlToSession: function(sessionId, url, callback) {
+		let sessions = this.db.collection(SESSIONS_COLLECTION);
+		this.getSessionUrls(sessionId, (urls) => {
+			urls.push(url);
+			sessions.update({_id: +sessionId}, {urls: urls});
+			callback(urls);
+		});
+	},
+
+	/**********DELETE**********/
+	/**
+	 * removeSession
+	 * @param {String} sessionId - The id of the session you want to remove
+	 */
+	removeSession: function(sessionId) {
+		let sessions = this.db.collection(SESSIONS_COLLECTION);
+		sessions.remove({_id: +sessionId}, (error) => {
+			if (error) throw error;
+		});
+	},
+	/**
+	 * removeImage
+	 * @param {String} url - The url corresponding to the intended image
+	 */
+	removeImage: function(url) {
+		let images = this.db.collection(IMAGES_COLLECTION);
+		images.remove({url: url}, (error) => {
+			if (error) throw error;
+		});
+	},
+	/**
+	 * removeTab
+	 * @param {String} url - The url corresponding to the intended tab
+	 */
+	removeTab: function(url) {
+		let tabs = this.db.collection(TABS_COLLECTION);
+		tabs.remove({url: url}, (error) => {
+			if (error) throw error;
+		});
+	},
+	/**
+	 * removeUrlFromSession
+	 * @param {String} sessionId - The id of the session where the url resides
+	 * @param {String} url - The url that you want to delete
+	 */
+	removeUrlFromSession: function(sessionId, url) {
+		this.getSessionUrls(sessionId, (urls) => {
+			urls.remove(url);
+			let sessions = this.db.collection(SESSIONS_COLLECTION);
+			sessions.update({_id: +sessionId}, {urls: urls});
+		});
 	}
 };

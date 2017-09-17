@@ -1,18 +1,9 @@
 //TODO: Add functionality to have saved sessions
-var tabs = chrome.extension.getBackgroundPage().tempTabs;
-var background = chrome.extension.getBackgroundPage();
+//TODO: Add 'Restore All' button
 var previewDialog = document.querySelector('#tabPreview');
 var renameDialog = document.querySelector('#renameDialog');
 var sessionId = (new URLSearchParams(window.location.search)).get('session');
-console.debug("SESSION ID: ", sessionId);
-background.getSessionUrls(sessionId, function (urls) {
-	for (url of urls) {
-		constructImageTab(url, function (imageTab) {
-			console.debug("IMAGE TAB: ", imageTab);
-			createCard(imageTab);
-		});
-	}
-});
+createAllCards(sessionId);
 
 initListeners();
 /**
@@ -33,6 +24,19 @@ function initListeners() {
 	document.querySelector('#rename').addEventListener('click', function (e) {
 		renameDialog.showModal();
 	});	
+}
+
+function createAllCards(sessionId) {
+	chrome.runtime.sendMessage({function: "getSessionUrls", params: {sessionId: sessionId}}, function(response) {
+		if (chrome.runtime.lastError) {
+			console.error("Error! ", chrome.runtime.lastError);
+		}
+		for(url of response.urls) {
+			constructImageTab(url, (imageTab) => {
+				createCard(imageTab);
+			});
+		}
+	});
 }
 
 /**
@@ -88,19 +92,20 @@ function deleteCard(id) {
 	if (parent.children.length == 1) {
 		if (confirm("There will be no tabs to keep. Close Window?")) {
 			parent.removeChild(child);
-			background.removeImage(url);
-			background.removeTab(url);
-			background.removeUrlFromSession(sessionId, url);
-			background.removeSession(sessionId, function () {
-				window.close();
-			});
+			removeCardFromDB(sessionId, url, true);
 		}		
 	} else {
 		parent.removeChild(child);
-		background.removeImage(url);
-		background.removeTab(url);
-		background.removeUrlFromSession(sessionId, url);
+		removeCardFromDB(sessionId, url, false);
 	}
+}
+
+function removeCardFromDB(sessionId, url, last) {
+	chrome.runtime.sendMessage({function: "removeCard", params: {sessionId: sessionId, url: url, last: last}}, (response) => {
+		if (response.last) {
+			window.close();
+		}
+	});
 }
 /**
  * deleteWithId:
@@ -150,12 +155,7 @@ function hidePreview(e) {
  * @param {Function} callback - Callback with the newly created imageTab object
  */
 function constructImageTab(url, callback) {
-	var imageTab = {};
-	background.getImage(url, function (dataUrl) {
-		imageTab.imageUrl = dataUrl;
-		background.getTab(url, function (tab) {
-			imageTab.tab = tab;
-			callback(imageTab);
-		});
+	chrome.runtime.sendMessage({function: "getImageTab", params: {url: url}}, (response) => {
+		callback(response.imageTab);
 	});
 }

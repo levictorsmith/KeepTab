@@ -1,5 +1,79 @@
+var db = require('./db.js');
 //TODO: Change all imageTabs to just regular tab objects
 //TODO: Add session functionality
+
+const EXTENSION_URL = chrome.runtime.getURL("/");
+
+/*
+ * Setup key-shortcuts and context menu items
+ */
+(function (db) {
+	// Create context menu items
+	var menuParentId = chrome.contextMenus.create({
+		"id": "parent",
+		"title": "KeepTab",
+		"contexts": ["page", "frame"]
+	});
+	chrome.contextMenus.create({"id": "merge", "title": "Merge into adjacent tab", "parentId": menuParentId});
+	chrome.contextMenus.onClicked.addListener(onMerge);
+
+	// Handle key-stroke events
+	chrome.commands.onCommand.addListener(function (command) {
+		switch (command) {
+			case "merge-default":
+			case "merge-left":
+			case "merge-right":
+				chrome.tabs.query({active: true, currentWindow: true}, function (tabs) {
+					var current = tabs[0];
+					onMerge(null, current, command);
+				});
+				break;
+		
+			default:
+				break;
+		}
+	});
+
+	// Handle messages from content script
+	chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+		if (message.hasOwnProperty('function')) {
+			switch (message.function) {
+				case "getSessionUrls":
+					db.getSessionUrls(message.params.sessionId, (urls) => {
+						sendResponse({urls: urls});
+					});
+					break;
+				case "getImageTab":
+					var imageTab = {};
+					db.getImage(message.params.url, (dataUrl) => {
+						imageTab.imageUrl = dataUrl;
+						db.getTab(message.params.url, (tab) => {
+							imageTab.tab = tab;
+							sendResponse({imageTab: imageTab});
+						});
+					});
+					break;
+				case "removeCard":
+					db.removeImage(message.params.url);
+					db.removeTab(message.params.url);
+					db.removeUrlFromSession(message.params.sessionId, message.params.url);
+					if (message.params.last) {
+						db.removeSession(message.params.sessionId);
+						sendResponse({last: true});
+					} else {
+						sendResponse({last: false});
+					}
+					break;
+				default:
+				console.error("Error: Unknown function");
+					break;
+			}
+			return true;
+		} else {
+			console.error("NO FUNCTION PARAMETER!");
+		}
+	});
+})(db);
 
 /**
  * onMerge: Handle the 'merge' event
@@ -7,9 +81,6 @@
  * @param {Object} tab - The details of the tab where the click took place. If the click did not take place in a tab, this parameter will be missing.
  */
 function onMerge(info, tab, command) {
-  if (info != null) {
-    console.log("Context menu item clicked", info.menuItemId);
-  }
   chrome.tabs.query({currentWindow: true}, function (tabs) {
     if (tabs.length <= 1) {
       return;
@@ -25,38 +96,9 @@ function onMerge(info, tab, command) {
 
   });
 }
-/**
- * Create context menu items
- */
-var menuParentId = chrome.contextMenus.create({
-  "id": "parent",
-	"title": "KeepTab",
-	"contexts": ["page", "frame"]
-});
-chrome.contextMenus.create({"id": "merge", "title": "Merge into adjacent tab", "parentId": menuParentId});
-chrome.contextMenus.onClicked.addListener(onMerge);
 
 /**
- * Handle key-stroke events
- */
-chrome.commands.onCommand.addListener(function (command) {
-  switch (command) {
-    case "merge-default":
-    case "merge-left":
-    case "merge-right":
-      chrome.tabs.query({active: true, currentWindow: true}, function (tabs) {
-        var current = tabs[0];
-        onMerge(null, current, command);
-      });
-      break;
-  
-    default:
-      break;
-  }
-});
-
-/**
- * getNextIndex: Returns the valid adjacent tab index
+ * getNextIndex: Returns the valid adjacent tab index, defaults to merge-left
  * @param {String} command - Type of key-stroke/command
  * @param {Object} tab - Currently focused tab
  * @param {Array} tabs - Array of all tabs in the currently focused window
@@ -79,7 +121,7 @@ function getNextIndex(command, tab, tabs) {
 function getFirstTabImage(imageTab1, imageTab2, tabs) {
   chrome.tabs.captureVisibleTab(function (dataUrl) {
     //Save image and tab to DB
-    insertImageTab(imageTab1, dataUrl);
+	 db.insertImageTab(imageTab1, dataUrl);
     getSecondTabImage(imageTab1, imageTab2, tabs);
   });
 }
@@ -94,7 +136,7 @@ function getSecondTabImage(imageTab1, imageTab2, tabs) {
   chrome.tabs.update(imageTab2.tab.id, {active: true}, function (focusedTab) {
     chrome.tabs.captureVisibleTab(function (dataUrl) {
 
-      insertImageTab(imageTab2, dataUrl);
+      db.insertImageTab(imageTab2, dataUrl);
       finishMerge(imageTab1, imageTab2);
     });
   });
@@ -116,9 +158,9 @@ function finishMerge(imageTab1, imageTab2) {
           sessionUrls = [];
           sessionUrls.push(imageTab1.tab.url);
           sessionUrls.push(imageTab2.tab.url);
-          insertSession(sessionUrls);
+          db.insertSession(sessionUrls);
         }
-        getSessionId(sessionUrls, function (id) {
+        db.getSessionId(sessionUrls, function (id) {
           var url = EXTENSION_URL + "keep.html?session=" + id;
           chrome.tabs.create({"url": url, "index": imageTab1.tab.index, active: true});        
         });
@@ -128,12 +170,13 @@ function finishMerge(imageTab1, imageTab2) {
 }
 
 /**
- * 
+ * mergeKeptTabs
  * @param {Object} imageTab1 - A tab with an attached image
  * @param {*} imageTab2 
  * @param {*} callback 
  */
 function mergeKeptTabs(imageTab1, imageTab2, callback) {
+	//TODO: Remove KeepTab tabs when merged
   var tab1HasKept = imageTab1.tab.url.includes(EXTENSION_URL + "keep.html");
   var tab2HasKept = imageTab2.tab.url.includes(EXTENSION_URL + "keep.html");
   var sessionId;
@@ -147,14 +190,14 @@ function mergeKeptTabs(imageTab1, imageTab2, callback) {
     var sessionId2 = urlParams2.get('session');
     var urls1;
     var urls2; 
-    getSessionUrls(sessionId1, function (urls) {
+    db.getSessionUrls(sessionId1, function (urls) {
       urls1 = urls;
-      getSessionUrls(sessionId2, function (urls) {
+      db.getSessionUrls(sessionId2, function (urls) {
         urls2 = urls;
         Array.prototype.push.apply(urls1, urls2);
-        insertSession(urls1);
-        removeSession(sessionId1);
-        removeSession(sessionId2);
+        db.insertSession(urls1);
+        db.removeSession(sessionId1);
+        db.removeSession(sessionId2);
         sessionUrls = urls1;
         callback(sessionUrls);
       });
@@ -162,14 +205,14 @@ function mergeKeptTabs(imageTab1, imageTab2, callback) {
   } else if (tab1HasKept) {
     let urlParams = (new URL(imageTab1.tab.url)).searchParams;
     sessionId = urlParams.get('session');
-    addUrlToSession(sessionId,imageTab2.tab.url, function (urls) {
+    db.addUrlToSession(sessionId,imageTab2.tab.url, function (urls) {
       sessionUrls = urls;
       callback(sessionUrls);
     });
   } else if (tab2HasKept) {
     let urlParams = (new URL(imageTab2.tab.url)).searchParams;
     sessionId = urlParams.get('session');
-    addUrlToSession(sessionId, imageTab1.tab.url, function (urls) {
+    db.addUrlToSession(sessionId, imageTab1.tab.url, function (urls) {
       sessionUrls = urls;
       callback(sessionUrls);
     });
